@@ -22,11 +22,6 @@ theatres_db_name = 'theatres.sqlite'
 restaurant_db_name = 'theatres.sqlite'
 
 headers = {'Authorization': 'Bearer {}'.format(YELP_API_Key)}
-# baseurl='https://api.yelp.com/v3/businesses/search'
-# params = {'term':'restaurants','latitude': 34.135343, 'longitude':-85.592379,'sort_by':'rating', 'limit': 3}
-# response = requests.get(baseurl, params=params, headers=headers)
-# print(response.text)
-# https://api.yelp.com/v3/businesses/search?term=delis&latitude=37.786882&longitude=-122.399972&sort_by=rating&limit=3&Authorization=Bearer 5qN25BH3-Ulo5WVDOJB2TUvjpqFp40yfCEEv8D0J6-iIZgx869eIjjxGgfhJ90XtBRuce-Up0WTAx25G1YaS-jAqSLDrHGHt79VU6Ig9Xb8Dq77w4R1SxsuQj0ZmYHYx
 
 class Theatre:
     '''
