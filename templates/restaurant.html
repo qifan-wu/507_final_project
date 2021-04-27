@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    table{
+        border: 2px solid rgb(240, 216, 7);
+    }
+    th, td {
+    border: 1px solid black;
+    font-size: medium;
+    font-family: 'Arial';
+    padding: 10px 10px;
+  }
+    table{
+            border: 2px solid rgb(252, 202, 109);
+        }
+    a {
+        color: black;
+        text-decoration: none;
+    }
+        td a.hover {
+        color: rgb(107, 134, 32);
+    }
+  </style>
+
+</head>
+<body>
+    <h1 align="center">
+        10 best restaurants near {{name}}
+    </h1>
+    <h2 align="center"><a href=/restaurants_barcharts/{{name.replace(" ", "%20")}}>
+        Click me to show the barcharts of ratings and review count
+    </a></h2>
+
+    <table align="center">
+        <tr>
+            <td>Name</td>
+            <td>Rating</td>
+            <td>Review Count</td>
+        </tr>
+        {% for k, v in restaurant_dict.items() %}
+        <tr>
+            <td>{{k}}</td>
+            <td>{{v[0]}}</td>
+            <td>{{v[1]}}</td>
+        </tr>
+        {% endfor %}
+    </table>
+</body>
+</html>

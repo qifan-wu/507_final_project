@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    table{
+        border: 2px solid rgb(240, 216, 7);
+    }
+    th, td {
+    border: 1px solid black;
+    font-size: medium;
+    font-family: 'Arial';
+    padding: 10px 40px;
+  }
+
+   td a {
+    color: black;
+    text-decoration: none;
+}
+  </style>
+  <title>Home</title>
+</head>
+<body>
+    <h1 align="center">
+        Let's find the largest theatres in a state!
+    </h1>
+    <h2 align="center">Click on the state name to choose a state</h2>
+    <table align="center">
+        <tr>
+            <td>ID</td>
+            <td>State</td>
+        </tr>
+        {% for id, state in states_dict.items() %}
+        <tr>
+            <td>{{id}}</td>
+            <td><a href="/theatres/{{state}}">{{state}}</a></td>
+        </tr>
+        {% endfor %}
+    </table>
+</body>
+</html>

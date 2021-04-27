@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    table{
+        border: 2px solid rgb(240, 216, 7);
+    }
+    th, td {
+    border: 1px solid black;
+    font-size: medium;
+    font-family: 'Arial';
+    padding: 10px 20px;
+  }
+
+   td a {
+    color: black;
+    text-decoration: none;
+}
+    td a.hover {
+    color: rgb(107, 134, 32);
+}
+  </style>
+</head>
+<body>
+    <h1 align="center">
+        The largest 10 theatres in {{name.capitalize()}}
+    </h1>
+    <div>
+        <center>{{ fig_div }}</center>
+    </div>
+    <h2 align="center">
+        Click on a theatre name to find 10 nearby restaurants, or click on the url link to go to the theatre's website!
+    </h2>
+    <table align="center">
+        <tr>
+            <td>ID</td>
+            <td>Name</td>
+            <td>Address</td>
+            <td>Zipcode</td>
+            <td>Screen</td>
+            <td>Phone</td>
+            <td>Website</td>
+        </tr>
+        {% for k, v in theatres_dict.items() %}
+        <tr>
+            <td>{{v[0]}}</td>
+            <td><a href="/nearby_restaurants/{{k}}">{{k}}</a></td>
+            <td>{{v[1]}}</td>
+            <td>{{v[2]}}</td>
+            <td>{{v[3]}}</td>
+            <td>{{v[4]}}</td>
+            <td><a href={{v[5]}}>{{v[5]}}</a></td>
+        </tr>
+        {% endfor %}
+    </table>
+</body>
+</html>

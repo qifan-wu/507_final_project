@@ -1,8 +1,7 @@
 #################################
-##### Name:Qifan Wu
-##### Uniqname:qifanw
+##### Name: Qifan Wu ############
+##### Uniqname: qifanw ##########
 #################################
-
 
 from bs4 import BeautifulSoup
 import requests
@@ -11,15 +10,18 @@ import secrets
 import sqlite3
 import pgeocode
 import sys
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+from plotly.offline import plot
+from flask import Flask, render_template, url_for, Markup
 
 cache_filename = 'theatres.json'
 cache_dict = {}
 res_cache_filename = 'restaurants.json'
 res_cache_dict = {}
-Mapquest_API_key = secrets.Mapquest_API_key
 YELP_API_Key = secrets.YELP_API_Key
+mapbox_access_token = secrets.mapbox_access_token
 theatres_db_name = 'theatres.sqlite'
-restaurant_db_name = 'theatres.sqlite'
 
 headers = {'Authorization': 'Bearer {}'.format(YELP_API_Key)}
 
@@ -53,7 +55,7 @@ class Theatre:
 
     def info(self):
         # return f"{self.name} ({self.screen} screens): {self.address} {self.zipcode}"
-        return f"{self.name} ({self.screen} screens): {self.address} {self.zipcode}{self.website}{self.phone}"
+        return f"{self.name} ({self.screen} screens): {self.address} zipcode {self.zipcode} {self.website}{self.phone}"
 
 class Restaurant:
     '''
@@ -62,7 +64,11 @@ class Restaurant:
     Instance Attributes
     -------------------
     name: string
-        the name of a theatre (e.g. 'Isle Royale'
+        the name of a restaurant (e.g. 'Isle Royale'
+    rating: float
+        the rating of a restaurant on yelp (e.g. 4.5)
+    review_count: int
+        the count of review (e.g. 300)
 
     '''
     def __init__(self, name, rating, review_count):
@@ -239,7 +245,7 @@ def get_10_theatres_for_state(state_url):
 
 def create_states_db():
     '''
-    Create a database states and url'
+    Create a database of states'
 
     Parameters
     --------
@@ -295,7 +301,7 @@ def get_states_info():
 
 def create_theatres_db():
     '''
-    Create a database of theatres' infomation in the states'
+    Create a database of theatres' infomation
 
     Parameters
     --------
@@ -327,7 +333,7 @@ def create_theatres_db():
     cur.execute(create_theatres)
     states_list = get_states_info()
 
-
+    ### Insert data
     for state in states_list:
         state_id = state[0]
         state_name = state[1]
@@ -346,8 +352,8 @@ def create_theatres_db():
     conn.commit()
     print("Finish Creating Theatre Database")
 
-
-###### finish building database
+##########################################
+###### finish building the database ######
 
 def get_theatre_info(state_name):
     '''get information of theatre from database
@@ -405,10 +411,7 @@ def get_nearby_res_json(coordinates):
     json
     '''
     baseurl='https://api.yelp.com/v3/businesses/search'
-    params = {'term':'restaurants','latitude': coordinates[0], 'longitude':coordinates[1],'sort_by':'rating', 'limit': 8}
-    # # params = {'term':'restaurants','latitude': 34.135343, 'longitude':-85.592379,'sort_by':'rating', 'limit': 3}
-    # response = requests.get(baseurl, params=params, headers=headers)
-    # return json.loads(response.text)
+    params = {'term':'restaurants','latitude': coordinates[0], 'longitude':coordinates[1],'sort_by':'rating', 'limit': 10}
     uniq_key = construct_unique_key(baseurl, params)
 
     if uniq_key in res_cache_dict.keys():
@@ -423,10 +426,18 @@ def get_nearby_res_json(coordinates):
     return restaurants_json
 
 def get_restaurant_instances_list(coordinates):
+    '''get the 10 nearby restaurants instances list from theatre's coordinates
+    Parameters
+    --------
+    coordinates: tuple
+    (latitude, longtitude)
+    Returns
+    --------
+    list
+    '''
     restaurant_list = []
     json = get_nearby_res_json(coordinates)
     for restaurant in json["businesses"]:
-        # yelp_id = restaurant["id"]
         name = restaurant["name"]
         rating = restaurant["rating"]
         review_count = restaurant["review_count"]
@@ -434,30 +445,210 @@ def get_restaurant_instances_list(coordinates):
         restaurant_list.append(restaurant_instance)
     return restaurant_list
 
+##########################
+###### data presentation##
+
+def draw_flask_barchart(x, y, title, color):
+    '''draw a barchart
+    Parameters
+    --------
+    x: list of x values
+    y: list of y values 
+
+    title: string
+    barchart's title
+
+    color: string
+    bar's color
+
+    Returns
+    ---------
+    fig_div: string
+        the plot that is readable by html files
+    '''
+    fig = make_subplots(rows=1, cols=1, specs=[[{"type": 'bar'}]], subplot_titles=(title))
+    fig.add_trace(go.Bar(x=x, y=y), row=1, col=1)
+    fig.update_traces(marker_color=color)
+    fig.update_layout(annotations=[dict(text=title, font_size=25, showarrow=False)])
+    fig_div = plot(fig, output_type="div")
+    return fig_div
+
+def draw_res_barcharts(restaurant_dict):
+    '''
+    Parameters
+    ------
+    restaurants_list: list
+    list of restaurants instances
+
+    Returns
+    -------
+    list
+    list of two figures
+    '''
+    title1 = 'Barchart of restaurants rating'
+    title2 = 'Barchart of restaurants review count'
+    name_list = []
+    review_list = []
+    rating_list = []
+    for k, v in restaurant_dict.items():
+        name_list.append(k)
+        rating_list.append(v[0])
+        review_list.append(v[1])
+    figure1 = draw_flask_barchart(name_list, rating_list, title1, "rgb(252, 202, 109)")
+    figure2 = draw_flask_barchart(name_list, review_list, title2, "rgb(102, 166, 218)")
+    figures = [figure1, figure2]
+    return figures
+
+####### flask ########
+######################
+
+app = Flask(__name__)
+@app.route('/')
+def index():
+    '''Home page of state names
+
+    Returns
+    --------
+    A html template
+    
+    '''
+    states_dict = {}
+    query = '''
+    SELECT ID, State FROM states;
+    '''
+    conn = sqlite3.connect(theatres_db_name)
+    cur = conn.cursor()
+    cur.execute(query)
+    for row in cur:
+        state_id = row[0]
+        state_name = row[1]
+        states_dict[state_id] = state_name.capitalize()
+    return render_template('index.html', states_dict=states_dict)
+
+@app.route('/theatres/<state_name>')
+def find_theatres(state_name):
+    '''
+    Parameters
+    -----------
+    state_name: string
+    state name in lowercase
+
+    Returns
+    --------
+    a html template that contains a theatres table and a map
+    '''
+    state_name = state_name.lower()
+    conn = sqlite3.connect(theatres_db_name)
+    cur = conn.cursor()
+    query = '''
+    select t.Name, t.Address, t.Zipcode, t.Screen, t.Phone, t.Website FROM states s
+    JOIN theatres t ON s.ID = t.State_ID
+    where s.State = "{}";
+    '''.format(state_name)
+    theatres_dict= {}
+    cur.execute(query)
+    # state_name = state_name.capitalize()
+    lat_list = []
+    lon_list = []
+    name_list = []
+    for index, row in enumerate(cur):
+        key = row[0].capitalize()
+        theatres_dict[key] = [index+1, row[1], row[2], row[3], row[4], row[5]]
+        lat, lon = get_coordinates(row[2])
+        lat_list.append(lat)
+        lon_list.append(lon)
+        name_list.append(key)
+
+    fig = go.Figure(go.Scattermapbox(
+    lat=lat_list,
+    lon=lon_list,
+    mode='markers',
+    marker=go.scattermapbox.Marker(
+        size=12
+    ),
+    text=name_list,
+    ))
+
+    fig.update_layout(
+        autosize=True,
+        hovermode='closest',
+        mapbox=dict(
+            accesstoken=mapbox_access_token,
+            bearing=0,
+            center=dict(
+                lat=lat_list[4],
+                lon=lon_list[4]
+            ),
+            pitch=0,
+            zoom=5
+        ),
+    )
+    fig_div = plot(fig, output_type="div")
+    # fig.write_html("atr.html", auto_open=True)
+    # return render_template('theatres.html', theatres_dict=theatres_dict, name=state_name)
+    return render_template('theatres.html', theatres_dict=theatres_dict, name=state_name, fig_div=Markup(fig_div))
+
+@app.route('/nearby_restaurants/<theatre_name>')
+def find_nearby_restaurants(theatre_name):
+    '''
+    Parameters
+    -----------
+    theatre_name: string
+    
+    Returns
+    --------
+    a html template that contains a restaurants table
+    '''
+    # theatre_name = theatre_name.replace('%20', ' ')
+    # theatre_name = theatre_name.capitalize()
+
+    conn = sqlite3.connect(theatres_db_name)
+    cur = conn.cursor()
+    query = '''
+    select Zipcode FROM theatres
+    where upper(Name) = "{}";
+    '''.format(theatre_name.upper())
+    cur.execute(query)
+    restaurant_dict = {}
+    for row in cur:
+        zipcode = row[0]
+        rlist = get_restaurant_instances_list(get_coordinates(zipcode))
+        for r in rlist:
+            restaurant_dict[r.name] = [r.rating, r.review_count]
+    return render_template('restaurant.html', restaurant_dict=restaurant_dict, name=theatre_name)
+
+@app.route('/restaurants_barcharts/<theatre_name>')
+def draw_barcharts(theatre_name):
+    '''
+    Parameters
+    -----------
+    theatre_name: string
+
+    Returns
+    --------
+    a html template that contains two barcharts of nearby restaurants rating and review count
+    '''
+    conn = sqlite3.connect(theatres_db_name)
+    cur = conn.cursor()
+    query = '''
+    select Zipcode FROM theatres
+    where upper(Name) = "{}";
+    '''.format(theatre_name.upper())
+    cur.execute(query)
+    restaurant_dict = {}
+    for row in cur:
+        zipcode = row[0]
+        rlist = get_restaurant_instances_list(get_coordinates(zipcode))
+        for r in rlist:
+            restaurant_dict[r.name] = [r.rating, r.review_count]
+    figures = draw_res_barcharts(restaurant_dict)
+    figure1 = figures[0]
+    figure2 = figures[1]
+    return render_template('barcharts.html', figure1=Markup(figure1), figure2=Markup(figure2))
 
 if __name__ == "__main__":
-        # print(get_theatre_instance('http://cinematreasures.org/theaters/55344').info())
     cache_dict = open_cache(cache_filename)
     res_cache_dict = open_cache(res_cache_filename)
-    # theatre = get_theatre_instance('http://cinematreasures.org/theaters/32905')
-    # print(theatre.info())
-    # state_dict = build_state_url_dict()
-    # print(state_dict)
-    # theatres = get_10_theatres_for_state('http://cinematreasures.org/theaters/united-states/michigan?sort=screens&order=desc')
-    # for theatre in theatres:
-    #     print(theatre.info())
-    
+    # create_states_db()
     # create_theatres_db()
-
-
-    # coordinates = (34.135343, -85.592379)
-    
-    # print(get_nearby_res_json(coordinates)["businesses"])
-    # for each in get_restaurant_instances_list(coordinates):
-    #     print(each.info())
-    # print(get_states_info()[2])
-    print("blaaaaa")
-    for instance in get_theatre_info('michigan')[:3]:
-        coordinates = get_coordinates(instance.zipcode)
-        for i in get_restaurant_instances_list(coordinates):
-            print(i.info())
+    app.run(debug=True)
